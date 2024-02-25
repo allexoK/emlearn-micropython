@@ -8,7 +8,7 @@
 #define tdc_malloc(num_of_bytes) m_malloc(num_of_bytes)
 #define tdc_realloc(ptr,old_num_bytes,new_num_bytes) m_realloc(ptr,new_num_bytes)
 #define tdc_free(ptr,num_of_bytes) m_free(ptr)
-// #define TDC_DEBUG_
+#define TDL_RAW
 #include "/home/alex/Documents/PlatformIO/Projects/decisionTreeC/lib/TinyDecisionTreeClassifierC/src/TinyDecisionTreeClassifierC/TinyDecisionTreeClassifierC.h"
 #include "/home/alex/Documents/PlatformIO/Projects/decisionTreeC/lib/TinyDecisionTreeClassifierC/src/TinyDecisionTreeClassifierLoaderC/TinyDecisionTreeClassifierLoaderC.h"
 
@@ -27,8 +27,8 @@ typedef struct _emltreeslearner_EmlTreeLearner_obj_t {
     mp_obj_base_t base;
     mp_uint_t max_depth;
     mp_uint_t min_sample_split;
-    float * rootsFloat;
-    float * nodesFloat;
+    float * roots;
+    float * nodes;
     uint32_t rootsSize;
     uint32_t nodesSize;
     struct Node* root;
@@ -43,6 +43,7 @@ mp_obj_full_type_t emltreeslearner_type_EmlTreeLearner;
 // the user instantiates a EmlTreeLearner object.
 STATIC mp_obj_t emltreeslearner_EmlTreeLearner_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
     // Allocates the new object and sets the type.
+    TDC_DEBUG_PRINTLN("New object");
     mp_arg_check_num(n_args, n_kw, 3, 3, false);
     
     emltreeslearner_EmlTreeLearner_obj_t *self = mp_obj_malloc(emltreeslearner_EmlTreeLearner_obj_t, type);
@@ -53,18 +54,20 @@ STATIC mp_obj_t emltreeslearner_EmlTreeLearner_make_new(const mp_obj_type_t *typ
     self->max_depth = mp_obj_get_int(args[1]);
     self->min_sample_split = mp_obj_get_int(args[2]);
     self->root = NULL;
-    self->rootsFloat = NULL;
-    self->nodesFloat = NULL;
+    self->roots = NULL;
+    self->nodes = NULL;
     self->readnodecounter = 0;
     self->readrootcounter = 0;
     return MP_OBJ_FROM_PTR(self);
 }
 
-STATIC mp_obj_t emltreeslearner_EmlTreeLearner_fit(size_t n_args, const mp_obj_t *args) {
-    mp_obj_t self_in = args[0];
+STATIC mp_obj_t emltreeslearner_EmlTreeLearner_fit(mp_obj_fun_bc_t *self_in,size_t n_args, size_t n_kw, mp_obj_t *args) {
+    mp_arg_check_num(n_args, n_kw, 4, 4, false);
+
     mp_obj_t X = args[1];
     mp_obj_t Y = args[2];
     mp_obj_t row_stride = args[3];
+
 
     emltreeslearner_EmlTreeLearner_obj_t *self = MP_OBJ_TO_PTR(self_in);
     if(!mp_obj_is_int(row_stride)){
@@ -72,27 +75,29 @@ STATIC mp_obj_t emltreeslearner_EmlTreeLearner_fit(size_t n_args, const mp_obj_t
     }
     uint32_t row_str = mp_obj_get_int(row_stride);
 
+    TDC_DEBUG_PRINTLN("1");
     mp_buffer_info_t bufinfo;
     mp_get_buffer_raise(X, &bufinfo, MP_BUFFER_RW);
     if (bufinfo.typecode != 'f') {
         mp_raise_ValueError(MP_ERROR_TEXT("Expecting float array on Y"));
     }
+    TDC_DEBUG_PRINTLN("2");
 
     mp_buffer_info_t bufinfo0;
     mp_get_buffer_raise(Y, &bufinfo0, MP_BUFFER_RW);
     if (bufinfo0.typecode != 'f') {
         mp_raise_ValueError(MP_ERROR_TEXT("Expecting float array on Y"));
     }
+    TDC_DEBUG_PRINTLN("3");
 
     if((mp_uint_t)((bufinfo.len)/sizeof(float)/row_str)!=(mp_uint_t)((bufinfo0.len)/sizeof(float))){
         mp_raise_ValueError(MP_ERROR_TEXT("X and Y have different number of rows"));    
     }
 
-    tdc_fit(&(self->root),(float*)bufinfo.buf,(float*)bufinfo0.buf,(bufinfo0.len)/sizeof(float),row_str,self->max_depth,self->min_sample_split);
-    self->rootsSize = 1;
+    tdc_fit(&self->root,(float*)bufinfo.buf,(float*)bufinfo0.buf,(bufinfo0.len)/sizeof(float),row_str,self->max_depth,self->min_sample_split);
     return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(emltreeslearner_EmlTreeLearner_fit_obj, 4, 4, emltreeslearner_EmlTreeLearner_fit);
+// STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(emltreeslearner_EmlTreeLearner_fit_obj, 4, 4, emltreeslearner_EmlTreeLearner_fit);
 
 STATIC mp_obj_t emltreeslearner_EmlTreeLearner_plot(mp_obj_t self_in) {
     emltreeslearner_EmlTreeLearner_obj_t *self = MP_OBJ_TO_PTR(self_in);
@@ -160,33 +165,33 @@ STATIC mp_obj_t emltreeslearner_EmlTreeLearner_addnode(size_t n_args, const mp_o
     if(!mp_obj_is_int(left)){
         mp_raise_ValueError(MP_ERROR_TEXT("Expecting int on left"));
     }
-    int left_v = mp_obj_get_int(left);
+    int32_t left_v = mp_obj_get_int(left);
 
     if(!mp_obj_is_int(right)){
         mp_raise_ValueError(MP_ERROR_TEXT("Expecting int on right"));
     }
-    int right_v = mp_obj_get_int(right);
+    int32_t right_v = mp_obj_get_int(right);
 
     if(!mp_obj_is_int(feature)){
         mp_raise_ValueError(MP_ERROR_TEXT("Expecting int on feature"));
     }
-    int feature_v = mp_obj_get_int(feature);
+    int32_t feature_v = mp_obj_get_int(feature);
     float value_v = mp_obj_get_float_to_f(value);
 
-    if(self->nodesFloat == NULL){
-        if(self->nodesFloat!=NULL)tdc_free(self->nodesFloat,self->nodesSize*sizeof(float));
-        self->nodesFloat = (float*)tdc_malloc(sizeof(float)*4);
-        self->nodesFloat[0]=(float)feature_v;
-        self->nodesFloat[1]=(float)value_v;
-        self->nodesFloat[2]=(float)left_v;
-        self->nodesFloat[3]=(float)right_v;
+    if(self->nodes == NULL){
+        if(self->nodes!=NULL)tdc_free(self->nodes,self->nodesSize);
+        self->nodes = (float*)tdc_malloc(sizeof(float)*4);
+        self->nodes[0]=feature_v;
+        self->nodes[1]=value_v;
+        self->nodes[2]=left_v;
+        self->nodes[3]=right_v;
         self->nodesSize = 4;
     }else{
-        self->nodesFloat = (float*)tdc_realloc(self->nodesFloat,self->nodesSize*sizeof(float),self->nodesSize*sizeof(float)+sizeof(float)*4);
-        self->nodesFloat[self->nodesSize]=(float)feature_v;
-        self->nodesFloat[self->nodesSize+1]=(float)value_v;
-        self->nodesFloat[self->nodesSize+2]=(float)left_v;
-        self->nodesFloat[self->nodesSize+3]=(float)right_v;
+        self->nodes = (float*)tdc_realloc(self->nodes,self->nodesSize,self->nodesSize+sizeof(float)*4);
+        self->nodes[self->nodesSize]=feature_v;
+        self->nodes[self->nodesSize+1]=value_v;
+        self->nodes[self->nodesSize+2]=left_v;
+        self->nodes[self->nodesSize+3]=right_v;
         self->nodesSize+=4;
     }
     return mp_const_none;
@@ -203,34 +208,30 @@ STATIC mp_obj_t emltreeslearner_EmlTreeLearner_addroot(size_t n_args, const mp_o
     }
     int32_t value_v = mp_obj_get_int(value);
 
-    if(self->rootsFloat == NULL){
-        if(self->rootsFloat!=NULL)tdc_free(self->rootsFloat,self->rootsSize*sizeof(float));
-        self->rootsFloat = (float*)tdc_malloc(sizeof(float));
-        self->rootsFloat[0]=value_v;
+    if(self->roots == NULL){
+        if(self->roots!=NULL)tdc_free(self->roots,self->rootsSize);
+        self->roots = (float*)tdc_malloc(sizeof(float)*4);
+        self->roots[0]=value_v;
         self->rootsSize = 1;
     }else{
-        self->rootsFloat = (float*)tdc_realloc(self->rootsFloat,self->rootsSize*sizeof(float),self->rootsSize*sizeof(float)+sizeof(float));
-        self->rootsFloat[self->rootsSize]=value_v;
+        self->roots = (float*)tdc_realloc(self->roots,self->rootsSize,self->rootsSize+sizeof(float));
+        self->roots[self->rootsSize]=value_v;
         self->rootsSize+=1;
     }
     return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(emltreeslearner_EmlTreeLearner_addroot_obj, 2, 2, emltreeslearner_EmlTreeLearner_addroot);
+STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(emltreeslearner_EmlTreeLearner_addroot_obj, 5, 5, emltreeslearner_EmlTreeLearner_addroot);
 
 STATIC mp_obj_t emltreeslearner_EmlTreeLearner_loadtreefrombuf(size_t n_args, const mp_obj_t *args) {
     mp_obj_t self_in = args[0];
     emltreeslearner_EmlTreeLearner_obj_t *self = MP_OBJ_TO_PTR(self_in);
 
-    tdc_cleanup(&(self->root));
-    struct Node** rootsLoaded = tdc_load_raw(self->rootsFloat,self->nodesFloat,self->rootsSize,self->nodesSize);
+    if(self->root!=NULL)tdc_free(self->root,sizeof(struct Node));
+    struct Node** rootsLoaded = tdc_load_raw(self->roots,self->nodes,self->rootsSize,self->nodesSize);
     self->root = rootsLoaded[0];
-    tdc_free(rootsLoaded,sizeof(struct Node*)*self->rootsSize);
-
-    tdc_free(self->nodesFloat,sizeof(float)*self->nodesSize);
-    self->nodesFloat = NULL;
-    tdc_free(self->rootsFloat,sizeof(float)*self->rootsSize);
-    self->rootsFloat = NULL;
-    self->nodesSize = 0;
+    tdc_free(rootsLoaded,sizeof(struct Node)*self->rootsSize);
+    tdc_free(self->nodes,sizeof(float)*self->nodesSize);
+    tdc_free(self->roots,sizeof(float)*self->rootsSize);
     return mp_const_none;
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(emltreeslearner_EmlTreeLearner_loadtreefrombuf_obj, 1, 1, emltreeslearner_EmlTreeLearner_loadtreefrombuf);
@@ -243,16 +244,13 @@ STATIC mp_obj_t emltreeslearner_EmlTreeLearner_savetreetobuf(size_t n_args, cons
     self->readrootcounter = 0;
 
     if(self->root != NULL){
-        if(self->rootsFloat != NULL){
-            tdc_free(self->rootsFloat,self->rootsSize*sizeof(float));
-            self->rootsFloat = NULL;
+        if(self->roots != NULL)tdc_free(self->roots,self->rootsSize);
+        self->roots = (float*)tdc_malloc(sizeof(float)*self->rootsSize);
+        if(self->nodes != NULL){
+            tdc_free(self->nodes,self->nodesSize);
+            self->nodes = NULL;
         }
-        self->rootsFloat = (float*)tdc_malloc(self->rootsSize*sizeof(float));
-        if(self->nodesFloat != NULL){
-            tdc_free(self->nodesFloat,self->nodesSize*sizeof(float));
-            self->nodesFloat = NULL;
-        }
-        tdc_save_raw(&self->nodesFloat,&self->nodesSize,self->rootsFloat,self->rootsSize,&(self->root));
+        tdc_save_raw(&self->nodes,&self->nodesSize,self->roots,self->rootsSize,&(self->root));
     }
     return mp_const_none;
 }
@@ -264,7 +262,7 @@ STATIC mp_obj_t emltreeslearner_EmlTreeLearner_readroot(size_t n_args, const mp_
 
     if(self->readrootcounter!=self->rootsSize){
         mp_obj_t nodedata[1] = {
-            mp_obj_new_int((long int)self->rootsFloat[self->readrootcounter]),  // Integer value
+            mp_obj_new_int((long int)self->roots[self->readrootcounter]),  // Integer value
         };
         self->readrootcounter++;
         return mp_obj_new_tuple(1, nodedata);
@@ -279,10 +277,10 @@ STATIC mp_obj_t emltreeslearner_EmlTreeLearner_readnode(size_t n_args, const mp_
 
     if(self->readnodecounter!=(long int)(self->nodesSize/TDL_LOADER_NODES_ROW_STRIDE)){
         mp_obj_t nodedata[4] = {
-            mp_obj_new_int((long int)self->nodesFloat[self->readnodecounter*TDL_LOADER_NODES_ROW_STRIDE]),  
-            mp_obj_new_float((long int)self->nodesFloat[self->readnodecounter*TDL_LOADER_NODES_ROW_STRIDE+1]),
-            mp_obj_new_int((long int)self->nodesFloat[self->readnodecounter*TDL_LOADER_NODES_ROW_STRIDE+2]),  
-            mp_obj_new_int((long int)self->nodesFloat[self->readnodecounter*TDL_LOADER_NODES_ROW_STRIDE+3]),  
+            mp_obj_new_int((long int)self->nodes[self->readnodecounter*TDL_LOADER_NODES_ROW_STRIDE]),  
+            mp_obj_new_float((long int)self->nodes[self->readnodecounter*TDL_LOADER_NODES_ROW_STRIDE+1]),
+            mp_obj_new_int((long int)self->nodes[self->readnodecounter*TDL_LOADER_NODES_ROW_STRIDE+2]),  
+            mp_obj_new_int((long int)self->nodes[self->readnodecounter*TDL_LOADER_NODES_ROW_STRIDE+3]),  
         };
         self->readnodecounter++;
         return mp_obj_new_tuple(4, nodedata);
@@ -307,7 +305,7 @@ mp_obj_t mpy_init(mp_obj_fun_bc_t *self, size_t n_args, size_t n_kw, mp_obj_t *a
 
     MP_OBJ_TYPE_SET_SLOT(&emltreeslearner_type_EmlTreeLearner, make_new, &emltreeslearner_EmlTreeLearner_make_new, 0);
 
-    emltreeslearner_EmlTreeLearner_locals_dict_table[0] = (mp_map_elem_t){ MP_OBJ_NEW_QSTR(MP_QSTR_fit), MP_OBJ_FROM_PTR(&emltreeslearner_EmlTreeLearner_fit_obj) };
+    emltreeslearner_EmlTreeLearner_locals_dict_table[0] = (mp_map_elem_t){ MP_OBJ_NEW_QSTR(MP_QSTR_fit), MP_DYNRUNTIME_MAKE_FUNCTION(emltreeslearner_EmlTreeLearner_fit)};
     emltreeslearner_EmlTreeLearner_locals_dict_table[1] = (mp_map_elem_t){ MP_OBJ_NEW_QSTR(MP_QSTR_plot), MP_OBJ_FROM_PTR(&emltreeslearner_EmlTreeLearner_plot_obj) };
     emltreeslearner_EmlTreeLearner_locals_dict_table[2] = (mp_map_elem_t){ MP_OBJ_NEW_QSTR(MP_QSTR_predict), MP_OBJ_FROM_PTR(&emltreeslearner_EmlTreeLearner_predict_obj) };
     emltreeslearner_EmlTreeLearner_locals_dict_table[3] = (mp_map_elem_t){ MP_OBJ_NEW_QSTR(MP_QSTR_score), MP_OBJ_FROM_PTR(&emltreeslearner_EmlTreeLearner_score_obj) };

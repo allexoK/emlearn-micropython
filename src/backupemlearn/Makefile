@@ -17,7 +17,7 @@ DIST_DIR := ../../dist/$(ARCH)_$(MPY_ABI_VERSION)
 MOD = emltreeslearner
 
 # Source files (.c or .py)
-SRC = emltreeslearner.c treeslearner.py
+SRC = emltreeslearner.c 
 
 # Stuff to make soft-float work
 SOFTFP_O := _arm_cmpsf2.o lesf2.o _arm_fixsfsi.o fixsfsi.o eqsf2.o gesf2.o
@@ -34,7 +34,7 @@ ifeq ($(SOFTFP_ENABLE), 1)
 	CLEAN_EXTRA += $(SOFTFP_O)
 endif
 
-DIV3_XTENSAWIN_O := _divsf3.o _extendsfdf2.o _addsubdf3.o _addsubsf3.o _divdf3.o _muldf3.o _truncdfsf2.o _floatunsidf.o
+DIV3_XTENSAWIN_O := _divsf3.o _extendsfdf2.o _addsubdf3.o _addsubsf3.o _divdf3.o _muldf3.o _truncdfsf2.o
 DIV3_XTENSAWIN_ENABLE := 0
 ifeq ($(ARCH), xtensawin)
 	DIV3_ENABLE=1

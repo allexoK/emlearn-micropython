@@ -1,0 +1,8 @@
+{
+    "files.associations": {
+        "tinydecisiontreeclassifierc.h": "c",
+        "tinydecisiontreeclassifierloaderc.h": "c",
+        "type_traits": "c",
+        "typeinfo": "c"
+    }
+}
